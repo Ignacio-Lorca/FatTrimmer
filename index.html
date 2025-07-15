@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Fat Trimmer - Lyrics & Chords Cleaner</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f4f4f4;
+      padding: 2em;
+      max-width: 700px;
+      margin: auto;
+    }
+    textarea, pre {
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 1em;
+      margin-bottom: 1em;
+    }
+    textarea {
+      height: 250px;
+      resize: vertical;
+      padding: 1em;
+    }
+    button {
+      padding: 0.7em 2em;
+      font-size: 1em;
+      background: #30a14e;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-right: 1em;
+      margin-bottom: 1em;
+    }
+    button:hover {
+      background: #22863a;
+    }
+    .output {
+      background: #fff;
+      border-radius: 5px;
+      border: 1px solid #d1d5da;
+      padding: 1em;
+      font-family: monospace;
+      white-space: pre-wrap;
+    }
+    h1 { font-size: 2em; margin-bottom: 0.4em; }
+    label { font-weight: bold; display: block; margin-bottom: 0.5em; }
+    #copy-success {
+      color: #22863a;
+      font-size: 1em;
+      margin-bottom: 1em;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Lyrics & Chords Cleaner</h1>
+  <label for="input">Paste messy lyrics/tab here:</label>
+  <textarea id="input" placeholder="Paste messy tab or lyrics here..."></textarea>
+  <button onclick="cleanLyrics()">Clean Up & Get Markdown</button>
+  <button onclick="copyOutput()">Copy Result</button>
+  <div id="copy-success">Copied to clipboard!</div>
+  <label for="output">Cleaned Markdown Output:</label>
+  <pre class="output" id="output"></pre>
+
+  <script>
+    function cleanLyrics() {
+      const raw = document.getElementById('input').value;
+
+      // 1. Extract title and artist (looks for "Song Title" and "Artist" lines)
+      let titleMatch = raw.match(/^\s*([^\n]+?)\s*Chords/i) || raw.match(/^\s*([^\n]+?)\s*$/m);
+      let title = titleMatch ? titleMatch[1].trim() : 'Unknown Title';
+
+      let artistMatch = raw.match(/^\s*([^\n]+?)\s*$/m);
+      let artist = 'Unknown Artist';
+      // Try to get artist from "Title by Artist" or "by Artist"
+      let byArtist = raw.match(/by\s+([^\n]+)/i);
+      if (byArtist) artist = byArtist[1].replace(/Chords.*/,'').trim();
+      else {
+        // Try to find a line after title that is just an artist name
+        let lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+        let idx = lines.findIndex(l => l.toLowerCase().includes(title.toLowerCase()));
+        if (idx >= 0 && idx + 1 < lines.length) {
+          artist = lines[idx + 1].replace(/Chords.*/,'').trim();
+        }
+      }
+
+      // 2. Extract lyrics with chords
+      // Get everything after the first "[Intro]" or "[Verse]" (or similar tag), or after "Tune down" etc.
+      let lyricsStart = raw.search(/^\s*\[(Intro|Verse|Chorus|Bridge|Outro)\]/im);
+      if (lyricsStart === -1) {
+        lyricsStart = raw.search(/Tune down|Capo|N\.C\.|A\s+D\s+G/i);
+      }
+      let lyricsPart = lyricsStart !== -1 ? raw.slice(lyricsStart) : raw;
+
+      // Remove everything after [Outro] section or last chord pattern
+      let outroIdx = lyricsPart.search(/Last update:|Rating|Please, rate this tab|Strumming pattern|Seen recently|Related tabs|comments|More Versions|All artists|©|Terms of Service|Privacy Policy|DMCA|Other|Articles/i);
+      if (outroIdx !== -1) {
+        lyricsPart = lyricsPart.slice(0, outroIdx);
+      }
+
+      // Clean up: remove menu lines, extra info lines, and comment blocks
+      // Remove lines with only saves/views/comments, authors, tuning, capo, key, difficulty, etc.
+      lyricsPart = lyricsPart.replace(/^[ \t]*(Speed.*|Tuning:.*|Key:.*|Capo:.*|Difficulty:.*|Author:.*|[0-9]+ views.*|[0-9]+ saves.*|[0-9]+ comments.*|^\s*Publish tab.*|^\s*Pro\+.*|^\s*Enter artist name.*|^\s*Courses.*|^\s*Songbooks.*|^\s*Articles.*|^\s*Forums.*|^\s*Tabs.*|^\s*Rating.*|^\s*Please, rate this tab.*|^\s*Strumming pattern.*|^\s*Edit.*|^\s*Intro.*bpm.*|^\s*Verse.*bpm.*|^\s*Chorus.*bpm.*|^\s*Seen recently.*|^\s*Related tabs.*|^\s*More Versions.*|^\s*Vocal.*|^\s*Rhythm Guitar.*|^\s*Solo Guitar.*|^\s*Drums.*|^\s*Use a mixing console.*|^\s*All artists.*|^\s*Discover.*|^\s*About UG.*|^\s*Site Rules.*|^\s*Advertise.*|^\s*Support.*|^\s*Legal.*|^\s*Terms of Service.*|^\s*Privacy Policy.*|^\s*DMCA.*|^\s*Other.*|^\s*Articles Staff.*|^\s*Fresh Tabs.*|^\s*MuseHub.*|^\s*Language.*|^\s*Hot Chords.*|^\s*Indonesia.*|^\s*apple store.*|^\s*google play.*|^\s*huawei store.*)$\n?/gim, '');
+
+      // Remove empty lines at head/tail and excessive blank lines
+      lyricsPart = lyricsPart.trim().replace(/\n{3,}/g, '\n\n');
+
+      // Reformat: add Markdown headers
+      let output = `# ${title}\n\n**Artist:** ${artist}\n\n---\n\n## Lyrics with Chords\n\n${lyricsPart.trim()}`;
+
+      document.getElementById('output').textContent = output;
+      document.getElementById('copy-success').style.display = 'none';
+    }
+
+    function copyOutput() {
+      const output = document.getElementById('output').textContent;
+      if (!output) return;
+      navigator.clipboard.writeText(output).then(function() {
+        const successDiv = document.getElementById('copy-success');
+        successDiv.style.display = 'block';
+        setTimeout(() => {
+          successDiv.style.display = 'none';
+        }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>
